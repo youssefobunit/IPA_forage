@@ -5052,7 +5052,9 @@ class _ForageHomeState extends State<ForageHome> {
           depots: depots,
           suppliers: suppliers,
           onAddSupplier: addSupplier,
-          allowGallery: widget.user.isAdmin,
+          // Purchase documents are selected from the device gallery for every
+          // user; they are not evidence that must be taken live.
+          allowGallery: true,
           initialProductId: initialProductId,
         ),
       ),
@@ -5411,7 +5413,8 @@ class _ForageHomeState extends State<ForageHome> {
           onUserAdded: widget.onUserAdded,
           canManageUsers: widget.user.isAdmin,
           canCreateTemporary: widget.user.isAdmin,
-          allowGallery: widget.user.isAdmin,
+          // A machine record needs a live, current photo of every unit.
+          allowGallery: false,
           depots: depots,
           available: depotStock,
         ),
@@ -14094,8 +14097,28 @@ class _ProductFormState extends State<ProductForm> {
   }
 
   Future<void> pick() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choisir depuis le téléphone'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
     final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 82,
       maxWidth: 1600,
     );
