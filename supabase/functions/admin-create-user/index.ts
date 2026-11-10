@@ -95,9 +95,12 @@ export default {
       return json({ error: "Username is already used or account creation failed" }, 409);
     }
 
+    // Upsert is deliberate: it also works when the profile trigger has not
+    // yet been installed, and is safe when that trigger already created it.
     const { data: profile, error: profileError } = await admin
       .from("profiles")
-      .update({
+      .upsert({
+        id: created.user.id,
         email,
         full_name: fullName,
         username,
@@ -105,9 +108,9 @@ export default {
         status: "active",
         allowed_pages: allowedPages,
         writable_pages: writablePages,
+        can_export: false,
         updated_at: new Date().toISOString(),
-      })
-      .eq("id", created.user.id)
+      }, { onConflict: "id" })
       .select()
       .single();
     if (profileError || !profile) {
