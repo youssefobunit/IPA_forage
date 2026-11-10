@@ -14,6 +14,7 @@ import 'package:path/path.dart' show join;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:excel_plus/excel_plus.dart' as xlsx;
@@ -399,6 +400,11 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+  } else {
+    // Android and iOS use sqflite's native database implementation. Without
+    // this assignment, the FFI factory is the only configured backend and the
+    // workshop cannot open after a mobile login.
+    databaseFactory = sqflite.databaseFactory;
   }
   await AppNotifications.initialize();
   runApp(const ForageApp());
