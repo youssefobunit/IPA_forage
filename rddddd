@@ -1,0 +1,175 @@
+[33mdedce77[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Merge remote-tracking branch 'origin/main'
+[33m789ddb9[m Merge remote repository with local project
+[33m802696e[m 1.0.3
+ RAPPORT_CONTROLE_SECURITE.txt                      |   28 [32m+[m
+ android/app/build.gradle.kts                       |    2 [32m+[m
+ android/app/src/main/AndroidManifest.xml           |    6 [32m+[m[31m-[m
+ lib/cloud_sync_client.dart                         |    7 [32m+[m
+ lib/main.dart                                      | 8355 [32m+++++++++++++++[m[31m-----[m
+ pubspec.lock                                       |    6 [32m+[m[31m-[m
+ pubspec.yaml                                       |    4 [32m+[m
+ windows/.gitignore                                 |   79 [32m+[m[31m-[m
+ windows/.metadata                                  |   30 [32m+[m
+ windows/RAPPORT_CONTROLE_SECURITE.txt              |  136 [32m+[m
+ windows/README.md                                  |   17 [32m+[m
+ windows/analysis_options.yaml                      |   36 [32m+[m
+ windows/demo_forage_data.json                      |  150 [32m+[m
+ .../flutter/ephemeral/.plugin_symlinks/file_saver  |    1 [32m+[m
+ .../.plugin_symlinks/file_selector_windows         |    1 [32m+[m
+ .../flutter_local_notifications_windows            |    1 [32m+[m
+ .../.plugin_symlinks/image_picker_windows          |    1 [32m+[m
+ windows/flutter/ephemeral/.plugin_symlinks/jni     |    1 [32m+[m
+ .../.plugin_symlinks/path_provider_windows         |    1 [32m+[m
+ .../flutter/ephemeral/.plugin_symlinks/printing    |    1 [32m+[m
+ .../ephemeral/.plugin_symlinks/windows_file_picker |    1 [32m+[m
+ .../cpp_client_wrapper/binary_messenger_impl.h     |   50 [32m+[m
+ .../cpp_client_wrapper/byte_buffer_streams.h       |  102 [32m+[m
+ .../cpp_client_wrapper/core_implementations.cc     |  284 [32m+[m
+ .../cpp_client_wrapper/engine_method_result.cc     |   11 [32m+[m
+ .../ephemeral/cpp_client_wrapper/flutter_engine.cc |  161 [32m+[m
+ .../cpp_client_wrapper/flutter_view_controller.cc  |   53 [32m+[m
+ .../include/flutter/basic_message_channel.h        |  149 [32m+[m
+ .../include/flutter/binary_messenger.h             |   53 [32m+[m
+ .../include/flutter/byte_streams.h                 |   85 [32m+[m
+ .../include/flutter/dart_project.h                 |  204 [32m+[m
+ .../include/flutter/encodable_value.h              |  292 [32m+[m
+ .../include/flutter/engine_method_result.h         |   86 [32m+[m
+ .../include/flutter/event_channel.h                |  181 [32m+[m
+ .../include/flutter/event_sink.h                   |   62 [32m+[m
+ .../include/flutter/event_stream_handler.h         |   77 [32m+[m
+ .../flutter/event_stream_handler_functions.h       |   78 [32m+[m
+ .../include/flutter/flutter_engine.h               |  145 [32m+[m
+ .../include/flutter/flutter_view.h                 |   43 [32m+[m
+ .../include/flutter/flutter_view_controller.h      |   76 [32m+[m
+ .../include/flutter/message_codec.h                |   62 [32m+[m
+ .../include/flutter/method_call.h                  |   43 [32m+[m
+ .../include/flutter/method_channel.h               |  151 [32m+[m
+ .../include/flutter/method_codec.h                 |  111 [32m+[m
+ .../include/flutter/method_result.h                |   76 [32m+[m
+ .../include/flutter/method_result_functions.h      |   80 [32m+[m
+ .../include/flutter/plugin_registrar.h             |  131 [32m+[m
+ .../include/flutter/plugin_registrar_windows.h     |  160 [32m+[m
+ .../include/flutter/plugin_registry.h              |   37 [32m+[m
+ .../include/flutter/standard_codec_serializer.h    |   76 [32m+[m
+ .../include/flutter/standard_message_codec.h       |   57 [32m+[m
+ .../include/flutter/standard_method_codec.h        |   73 [32m+[m
+ .../include/flutter/texture_registrar.h            |  111 [32m+[m
+ .../cpp_client_wrapper/plugin_registrar.cc         |   62 [32m+[m
+ .../flutter/ephemeral/cpp_client_wrapper/readme    |    9 [32m+[m
+ .../ephemeral/cpp_client_wrapper/standard_codec.cc |  468 [32m++[m
+ .../cpp_client_wrapper/texture_registrar_impl.h    |   44 [32m+[m
+ windows/flutter/ephemeral/flutter_export.h         |   28 [32m+[m
+ windows/flutter/ephemeral/flutter_messenger.h      |  144 [32m+[m
+ .../flutter/ephemeral/flutter_plugin_registrar.h   |   45 [32m+[m
+ .../flutter/ephemeral/flutter_texture_registrar.h  |  187 [32m+[m
+ windows/flutter/ephemeral/flutter_windows.dll      |  Bin [31m0[m -> [32m46623744[m bytes
+ windows/flutter/ephemeral/flutter_windows.dll.exp  |  Bin [31m0[m -> [32m27140[m bytes
+ windows/flutter/ephemeral/flutter_windows.dll.lib  |  Bin [31m0[m -> [32m46490[m bytes
+ windows/flutter/ephemeral/flutter_windows.dll.pdb  |  Bin [31m0[m -> [32m278679552[m bytes
+ windows/flutter/ephemeral/flutter_windows.h        |  408 [32m+[m
+ windows/flutter/ephemeral/generated_config.cmake   |   24 [32m+[m
+ windows/flutter/ephemeral/icudtl.dat               |  Bin [31m0[m -> [32m864880[m bytes
+ windows/pubspec.lock                               |  882 [32m+++[m
+ windows/pubspec.yaml                               |  106 [32m+[m
+ 70 files changed, 12626 insertions(+), 2005 deletions(-)
+[33m9b56176[m Create dart.yml
+ .github/workflows/dart.yml | 42 [32m++++++++++++++++++++++++++++++++++++++++++[m
+ 1 file changed, 42 insertions(+)
+[33m083860e[m Prepare FORAGE ZOUHOUR for iOS build
+ .gitignore                                         |    62 [32m+[m
+ .metadata                                          |    30 [32m+[m
+ .vscode/settings.json                              |     3 [32m+[m
+ RAPPORT_CONTROLE_SECURITE.txt                      |   108 [32m+[m
+ README.md                                          |    17 [32m+[m
+ analysis_options.yaml                              |    36 [32m+[m
+ android/.gitignore                                 |    14 [32m+[m
+ android/app/build.gradle.kts                       |   111 [32m+[m
+ android/app/src/debug/AndroidManifest.xml          |     7 [32m+[m
+ android/app/src/main/AndroidManifest.xml           |    56 [32m+[m
+ .../main/kotlin/com/example/forage/MainActivity.kt |    17 [32m+[m
+ .../main/res/drawable-v21/launch_background.xml    |    12 [32m+[m
+ .../src/main/res/drawable/launch_background.xml    |    12 [32m+[m
+ .../app/src/main/res/mipmap-hdpi/ic_launcher.png   |   Bin [31m0[m -> [32m8161[m bytes
+ .../app/src/main/res/mipmap-mdpi/ic_launcher.png   |   Bin [31m0[m -> [32m4049[m bytes
+ .../app/src/main/res/mipmap-xhdpi/ic_launcher.png  |   Bin [31m0[m -> [32m13326[m bytes
+ .../app/src/main/res/mipmap-xxhdpi/ic_launcher.png |   Bin [31m0[m -> [32m26217[m bytes
+ .../src/main/res/mipmap-xxxhdpi/ic_launcher.png    |   Bin [31m0[m -> [32m42499[m bytes
+ android/app/src/main/res/values-night/styles.xml   |    18 [32m+[m
+ android/app/src/main/res/values/styles.xml         |    18 [32m+[m
+ android/app/src/profile/AndroidManifest.xml        |     7 [32m+[m
+ android/build.gradle.kts                           |    24 [32m+[m
+ android/gradle.properties                          |     9 [32m+[m
+ android/gradle/wrapper/gradle-wrapper.properties   |     5 [32m+[m
+ android/settings.gradle.kts                        |    26 [32m+[m
+ assets/app_logo.png                                |   Bin [31m0[m -> [32m872391[m bytes
+ demo_forage_data.json                              |   150 [32m+[m
+ ios/.gitignore                                     |    34 [32m+[m
+ ios/Flutter/AppFrameworkInfo.plist                 |    24 [32m+[m
+ ios/Flutter/Debug.xcconfig                         |     1 [32m+[m
+ ios/Flutter/Release.xcconfig                       |     1 [32m+[m
+ ios/Runner.xcodeproj/project.pbxproj               |   647 [32m++[m
+ .../project.xcworkspace/contents.xcworkspacedata   |     7 [32m+[m
+ .../xcshareddata/IDEWorkspaceChecks.plist          |     8 [32m+[m
+ .../xcshareddata/WorkspaceSettings.xcsettings      |     8 [32m+[m
+ .../xcshareddata/xcschemes/Runner.xcscheme         |   119 [32m+[m
+ ios/Runner.xcworkspace/contents.xcworkspacedata    |     7 [32m+[m
+ .../xcshareddata/IDEWorkspaceChecks.plist          |     8 [32m+[m
+ .../xcshareddata/WorkspaceSettings.xcsettings      |     8 [32m+[m
+ ios/Runner/AppDelegate.swift                       |    16 [32m+[m
+ .../AppIcon.appiconset/Contents.json               |   122 [32m+[m
+ .../AppIcon.appiconset/Icon-App-1024x1024@1x.png   |   Bin [31m0[m -> [32m872391[m bytes
+ .../AppIcon.appiconset/Icon-App-20x20@1x.png       |   Bin [31m0[m -> [32m1018[m bytes
+ .../AppIcon.appiconset/Icon-App-20x20@2x.png       |   Bin [31m0[m -> [32m2970[m bytes
+ .../AppIcon.appiconset/Icon-App-20x20@3x.png       |   Bin [31m0[m -> [32m5904[m bytes
+ .../AppIcon.appiconset/Icon-App-29x29@1x.png       |   Bin [31m0[m -> [32m1762[m bytes
+ .../AppIcon.appiconset/Icon-App-29x29@2x.png       |   Bin [31m0[m -> [32m5637[m bytes
+ .../AppIcon.appiconset/Icon-App-29x29@3x.png       |   Bin [31m0[m -> [32m11154[m bytes
+ .../AppIcon.appiconset/Icon-App-40x40@1x.png       |   Bin [31m0[m -> [32m2970[m bytes
+ .../AppIcon.appiconset/Icon-App-40x40@2x.png       |   Bin [31m0[m -> [32m9724[m bytes
+ .../AppIcon.appiconset/Icon-App-40x40@3x.png       |   Bin [31m0[m -> [32m19240[m bytes
+ .../AppIcon.appiconset/Icon-App-60x60@2x.png       |   Bin [31m0[m -> [32m19240[m bytes
+ .../AppIcon.appiconset/Icon-App-60x60@3x.png       |   Bin [31m0[m -> [32m37967[m bytes
+ .../AppIcon.appiconset/Icon-App-76x76@1x.png       |   Bin [31m0[m -> [32m8901[m bytes
+ .../AppIcon.appiconset/Icon-App-76x76@2x.png       |   Bin [31m0[m -> [32m28720[m bytes
+ .../AppIcon.appiconset/Icon-App-83.5x83.5@2x.png   |   Bin [31m0[m -> [32m33597[m bytes
+ .../LaunchImage.imageset/Contents.json             |    23 [32m+[m
+ .../LaunchImage.imageset/LaunchImage.png           |   Bin [31m0[m -> [32m68[m bytes
+ .../LaunchImage.imageset/LaunchImage@2x.png        |   Bin [31m0[m -> [32m68[m bytes
+ .../LaunchImage.imageset/LaunchImage@3x.png        |   Bin [31m0[m -> [32m68[m bytes
+ .../Assets.xcassets/LaunchImage.imageset/README.md |     5 [32m+[m
+ ios/Runner/Base.lproj/LaunchScreen.storyboard      |    37 [32m+[m
+ ios/Runner/Base.lproj/Main.storyboard              |    26 [32m+[m
+ ios/Runner/Info.plist                              |    74 [32m+[m
+ ios/Runner/Runner-Bridging-Header.h                |     1 [32m+[m
+ ios/Runner/SceneDelegate.swift                     |     6 [32m+[m
+ ios/RunnerTests/RunnerTests.swift                  |    12 [32m+[m
+ lib/main.dart                                      | 11573 [32m+++++++++++++++++++[m
+ pubspec.lock                                       |   882 [32m++[m
+ pubspec.yaml                                       |   102 [32m+[m
+ test/widget_test.dart                              |   188 [32m+[m
+ web/favicon.png                                    |   Bin [31m0[m -> [32m2079[m bytes
+ web/icons/Icon-192.png                             |   Bin [31m0[m -> [32m42499[m bytes
+ web/icons/Icon-512.png                             |   Bin [31m0[m -> [32m236457[m bytes
+ web/icons/Icon-maskable-192.png                    |   Bin [31m0[m -> [32m42499[m bytes
+ web/icons/Icon-maskable-512.png                    |   Bin [31m0[m -> [32m236457[m bytes
+ web/index.html                                     |    46 [32m+[m
+ web/manifest.json                                  |    35 [32m+[m
+ windows/.gitignore                                 |    17 [32m+[m
+ windows/CMakeLists.txt                             |   108 [32m+[m
+ windows/flutter/CMakeLists.txt                     |   109 [32m+[m
+ windows/flutter/generated_plugin_registrant.cc     |    20 [32m+[m
+ windows/flutter/generated_plugin_registrant.h      |    15 [32m+[m
+ windows/flutter/generated_plugins.cmake            |    28 [32m+[m
+ windows/runner/CMakeLists.txt                      |    40 [32m+[m
+ windows/runner/Runner.rc                           |   121 [32m+[m
+ windows/runner/flutter_window.cpp                  |    71 [32m+[m
+ windows/runner/flutter_window.h                    |    33 [32m+[m
+ windows/runner/main.cpp                            |    43 [32m+[m
+ windows/runner/resource.h                          |    16 [32m+[m
+ windows/runner/resources/app_icon.ico              |   Bin [31m0[m -> [32m41086[m bytes
+ windows/runner/runner.exe.manifest                 |    14 [32m+[m
+ windows/runner/utils.cpp                           |    69 [32m+[m
+ windows/runner/utils.h                             |    19 [32m+[m
+ windows/runner/win32_window.cpp                    |   288 [32m+[m
+ windows/runner/win32_window.h                      |   102 [32m+[m
+ 96 files changed, 15875 insertions(+)

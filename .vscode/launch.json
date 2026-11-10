@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FORAGE · Supabase local (Windows)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=SUPABASE_URL=http://localhost:8000",
+        "--dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_YfTfm4XJTP-XN-OqSe-XUA_QfrA10rA",
+        "--dart-define=FORAGE_DATABASE_NAME=forage-local-test.db"
+      ]
+    }
+  ]
+}
