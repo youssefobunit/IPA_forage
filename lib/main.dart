@@ -37,7 +37,13 @@ const _supabasePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
   defaultValue: 'sb_publishable_Yo7doKg9rULQ4Cd6JH_qhA_wQxELhnL',
 );
-const _showStartupDiagnostics = bool.fromEnvironment('FORAGE_DIAGNOSTICS');
+// Keep the startup error visible in release builds until the device database
+// and cloud setup have been verified. This makes mobile-only failures
+// diagnosable without connecting the phone to a development computer.
+const _showStartupDiagnostics = bool.fromEnvironment(
+  'FORAGE_DIAGNOSTICS',
+  defaultValue: true,
+);
 const _localDatabaseName = String.fromEnvironment(
   'FORAGE_DATABASE_NAME',
   defaultValue: 'forage.db',
