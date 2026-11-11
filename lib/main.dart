@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -17533,62 +17533,63 @@ class _UserFormState extends State<UserForm> {
   );
 }
 
-/// Nine-point pattern input. A point can be used only once; tap selected
-/// points again to remove them, and the clear button starts a new pattern.
+/// Nine-point pattern input drawn with one continuous finger gesture.
 class PatternPad extends StatelessWidget {
   const PatternPad({super.key, required this.pattern, required this.onChanged});
   final List<int> pattern;
   final ValueChanged<List<int>>? onChanged;
 
+  int? _pointAt(Offset offset, double side) {
+    const count = 3;
+    final gap = side / count;
+    for (var index = 0; index < 9; index++) {
+      final center = Offset(
+        (index % count + .5) * gap,
+        (index ~/ count + .5) * gap,
+      );
+      if ((offset - center).distance <= gap * .3) return index;
+    }
+    return null;
+  }
+
+  void _add(Offset offset, double side, {bool reset = false}) {
+    if (onChanged == null) return;
+    final point = _pointAt(offset, side);
+    if (point == null) return;
+    final next = reset ? <int>[] : List<int>.of(pattern);
+    if (!next.contains(point)) next.add(point);
+    onChanged!(next);
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      const Text('Dessinez votre schéma (4 points minimum).'),
+      const Text('Glissez le doigt entre les points (4 minimum).'),
       const SizedBox(height: 10),
       SizedBox(
-        width: 210,
-        child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 9,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 18,
-            crossAxisSpacing: 18,
-          ),
-          itemBuilder: (context, index) {
-            final selected = pattern.contains(index);
-            return InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onChanged == null
-                  ? null
-                  : () {
-                      final next = List<int>.of(pattern);
-                      selected ? next.remove(index) : next.add(index);
-                      onChanged!(next);
-                    },
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? AppPalette.primary : AppPalette.soft,
-                  border: Border.all(
-                    color: selected ? AppPalette.primary : AppPalette.line,
-                    width: 2,
+        width: 230,
+        height: 230,
+        child: LayoutBuilder(
+          builder: (context, constraints) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanStart: onChanged == null
+                ? null
+                : (details) => _add(
+                    details.localPosition,
+                    constraints.maxWidth,
+                    reset: true,
                   ),
-                ),
-                child: selected
-                    ? Text(
-                        '${pattern.indexOf(index) + 1}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF151515),
-                          fontWeight: FontWeight.w900,
-                        ),
-                      )
-                    : null,
-              ),
-            );
-          },
+            onPanUpdate: onChanged == null
+                ? null
+                : (details) => _add(
+                    details.localPosition,
+                    constraints.maxWidth,
+                  ),
+            child: CustomPaint(
+              painter: _PatternPadPainter(pattern),
+              child: const SizedBox.expand(),
+            ),
+          ),
         ),
       ),
       TextButton.icon(
@@ -17598,6 +17599,52 @@ class PatternPad extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _PatternPadPainter extends CustomPainter {
+  const _PatternPadPainter(this.pattern);
+  final List<int> pattern;
+
+  Offset _center(int index, double side) => Offset(
+    (index % 3 + .5) * side / 3,
+    (index ~/ 3 + .5) * side / 3,
+  );
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final side = size.shortestSide;
+    final line = Paint()
+      ..color = AppPalette.primary
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    final path = Path();
+    for (var i = 0; i < pattern.length; i++) {
+      final point = _center(pattern[i], side);
+      i == 0 ? path.moveTo(point.dx, point.dy) : path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(path, line);
+    for (var i = 0; i < 9; i++) {
+      final selected = pattern.contains(i);
+      final point = _center(i, side);
+      canvas.drawCircle(
+        point,
+        side / 11,
+        Paint()..color = selected ? AppPalette.primary : AppPalette.soft,
+      );
+      canvas.drawCircle(
+        point,
+        side / 11,
+        Paint()
+          ..color = selected ? AppPalette.primary : AppPalette.line
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PatternPadPainter oldDelegate) =>
+      !listEquals(pattern, oldDelegate.pattern);
 }
 
 class ImageInput extends StatelessWidget {
