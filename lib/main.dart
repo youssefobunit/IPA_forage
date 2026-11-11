@@ -408,6 +408,19 @@ abstract final class SupabaseAccounts {
     );
   }
 
+  static Future<List<TrustedDevice>> trustedDevices() async {
+    final rows = await _client
+        .from('trusted_devices')
+        .select('id, user_id, device_label, is_primary, access_status, last_seen_at')
+        .order('last_seen_at', ascending: false);
+    return (rows as List).cast<Map<String, dynamic>>().map(TrustedDevice.fromRow).toList();
+  }
+
+  static Future<void> setDeviceStatus(String id, String status) => _client.rpc(
+    'set_forage_device_status',
+    params: {'p_device_id': id, 'p_status': status},
+  );
+
   static AppUser _fromProfile(Map<String, dynamic> row) {
     final email = (row['email'] as String? ?? '').trim();
     final username = (row['username'] as String?)?.trim();
@@ -473,6 +486,25 @@ class DeviceAccessRequest {
   final String deviceId;
   final String deviceLabel;
   final DateTime requestedAt;
+}
+
+class TrustedDevice {
+  const TrustedDevice({
+    required this.id, required this.userId, required this.label,
+    required this.primary, required this.status,
+  });
+  factory TrustedDevice.fromRow(Map<String, dynamic> row) => TrustedDevice(
+    id: row['id'] as String,
+    userId: row['user_id'] as String,
+    label: row['device_label'] as String? ?? 'Appareil inconnu',
+    primary: row['is_primary'] == true,
+    status: row['access_status'] as String? ?? 'active',
+  );
+  final String id;
+  final String userId;
+  final String label;
+  final bool primary;
+  final String status;
 }
 
 abstract final class AppPalette {
@@ -13710,15 +13742,24 @@ class DeviceRequestsPage extends StatefulWidget {
 
 class _DeviceRequestsPageState extends State<DeviceRequestsPage> {
   late Future<List<DeviceAccessRequest>> requests;
+  late Future<List<TrustedDevice>> devices;
 
   @override
   void initState() {
     super.initState();
     requests = SupabaseAccounts.pendingDeviceRequests();
+    devices = SupabaseAccounts.trustedDevices();
   }
 
-  void reload() =>
-      setState(() => requests = SupabaseAccounts.pendingDeviceRequests());
+  void reload() => setState(() {
+    requests = SupabaseAccounts.pendingDeviceRequests();
+    devices = SupabaseAccounts.trustedDevices();
+  });
+
+  Future<void> changeStatus(TrustedDevice device, String status) async {
+    await SupabaseAccounts.setDeviceStatus(device.id, status);
+    reload();
+  }
 
   Future<void> decide(
     DeviceAccessRequest request, {
@@ -13737,7 +13778,7 @@ class _DeviceRequestsPageState extends State<DeviceRequestsPage> {
           approve
               ? (makePrimary
                     ? 'Appareil principal approuvé.'
-                    : 'Accès ponctuel approuvé.')
+                    : 'Appareil secondaire autorisé.')
               : 'Appareil refusé.',
         );
       }
@@ -13776,14 +13817,42 @@ class _DeviceRequestsPageState extends State<DeviceRequestsPage> {
           );
         }
         final values = snapshot.data ?? const <DeviceAccessRequest>[];
-        if (values.isEmpty) {
-          return const Center(child: Text('Aucune demande en attente.'));
-        }
         return ListView.separated(
           padding: const EdgeInsets.all(16),
-          itemCount: values.length,
+          itemCount: values.length + 1,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
+            if (index == values.length) {
+              return FutureBuilder<List<TrustedDevice>>(
+                future: devices,
+                builder: (context, deviceSnapshot) {
+                  final items = deviceSnapshot.data ?? const <TrustedDevice>[];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Appareils autorisés', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                      const SizedBox(height: 8),
+                      if (items.isEmpty) const Text('Aucun appareil approuvé.'),
+                      ...items.map((device) => Glass(
+                        child: ListTile(
+                          leading: Icon(device.primary ? Icons.star_rounded : Icons.phone_android_rounded),
+                          title: Text('${widget.userName(device.userId)} · ${device.label}'),
+                          subtitle: Text(device.primary ? 'Principal · ${device.status}' : 'Secondaire · ${device.status}'),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) => changeStatus(device, value),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'active', child: Text('Autoriser')),
+                              PopupMenuItem(value: 'suspended', child: Text('Suspendre')),
+                              PopupMenuItem(value: 'blocked', child: Text('Bloquer')),
+                            ],
+                          ),
+                        ),
+                      )),
+                    ],
+                  );
+                },
+              );
+            }
             final request = values[index];
             return Glass(
               child: Padding(
@@ -13810,7 +13879,7 @@ class _DeviceRequestsPageState extends State<DeviceRequestsPage> {
                         FilledButton.icon(
                           onPressed: () => decide(request, approve: true),
                           icon: const Icon(Icons.check_rounded),
-                          label: const Text('Autoriser cette fois'),
+                          label: const Text('Autoriser cet appareil'),
                         ),
                         FilledButton.icon(
                           onPressed: () =>
