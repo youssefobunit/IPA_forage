@@ -52,6 +52,7 @@ dependencies:
   device_info_plus: ^13.3.0
   flutter_secure_storage: ^11.2.0
   excel_plus: ^0.0.3
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

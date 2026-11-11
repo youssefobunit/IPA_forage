@@ -21,6 +21,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:excel_plus/excel_plus.dart' as xlsx;
 import 'package:file_saver/file_saver.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'cloud_sync_client.dart';
 import 'device_identity.dart';
@@ -51,6 +52,54 @@ const _localDatabaseName = String.fromEnvironment(
   // photo that Android cannot read. The cloud workspace is restored on launch.
   defaultValue: 'forage-v2.db',
 );
+const _appVersion = '1.0.6+7';
+const _githubLatestRelease =
+    'https://api.github.com/repos/youssefobunit/IPA_forage/releases/latest';
+
+class AppUpdate {
+  const AppUpdate({required this.version, required this.downloadUrl});
+  final String version;
+  final String downloadUrl;
+}
+
+abstract final class GitHubUpdates {
+  static Future<AppUpdate?> check() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final request = await HttpClient().getUrl(Uri.parse(_githubLatestRelease));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+      request.headers.set(HttpHeaders.userAgentHeader, 'FORAGE-ZOUHOUR/$_appVersion');
+      final response = await request.close().timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(await utf8.decoder.bind(response).join()) as Map;
+      final tag = data['tag_name']?.toString() ?? '';
+      final assets = (data['assets'] as List? ?? const []);
+      final apk = assets.cast<Map>().firstWhere(
+        (asset) => asset['name']?.toString().toLowerCase().endsWith('.apk') == true,
+        orElse: () => const {},
+      );
+      final url = apk['browser_download_url']?.toString();
+      if (url == null || !_isNewer(tag, _appVersion)) return null;
+      return AppUpdate(version: tag.replaceFirst(RegExp('^[vV]'), ''), downloadUrl: url);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isNewer(String remote, String current) {
+    List<int> parts(String value) => RegExp(r'\d+').allMatches(value)
+        .map((match) => int.parse(match.group(0)!))
+        .toList();
+    final a = parts(remote);
+    final b = parts(current);
+    for (var i = 0; i < max(a.length, b.length); i++) {
+      final left = i < a.length ? a[i] : 0;
+      final right = i < b.length ? b[i] : 0;
+      if (left != right) return left > right;
+    }
+    return false;
+  }
+}
 
 // Android CursorWindow cannot read a database row containing multi-megabyte
 // photos. Keep every stored image small enough for a row with several photos.
@@ -3790,6 +3839,7 @@ class _ForageAppState extends State<ForageApp> {
   AppUser? current;
   var loading = true;
   String? startupError;
+  AppUpdate? update;
 
   @override
   void initState() {
@@ -3800,6 +3850,12 @@ class _ForageAppState extends State<ForageApp> {
           cloudSync: SupabaseCloudSyncClient(Supabase.instance.client),
         );
     loadUsers();
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final available = await GitHubUpdates.check();
+    if (mounted) setState(() => update = available);
   }
 
   Future<void> loadUsers() async {
@@ -3972,6 +4028,18 @@ class _ForageAppState extends State<ForageApp> {
         ),
       ),
     ),
+    builder: (context, child) => Stack(
+      children: [
+        child ?? const SizedBox.shrink(),
+        if (update != null)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: _UpdateBanner(update: update!),
+            ),
+          ),
+      ],
+    ),
     home: loading
         ? const Scaffold(body: Center(child: CircularProgressIndicator()))
         : startupError != null
@@ -4062,6 +4130,41 @@ class _StartupFailure extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    ),
+  );
+}
+
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.update});
+  final AppUpdate update;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: AppPalette.surfaceRaised,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppPalette.primary),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.system_update_rounded, color: AppPalette.primary),
+          const SizedBox(width: 10),
+          Text('Mise à jour ${update.version} disponible'),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: () => launchUrl(
+              Uri.parse(update.downloadUrl),
+              mode: LaunchMode.externalApplication,
+            ),
+            child: const Text('Mise à jour'),
+          ),
+        ],
       ),
     ),
   );
