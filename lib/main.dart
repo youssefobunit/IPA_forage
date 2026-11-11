@@ -99,19 +99,11 @@ Future<String> passwordFromPattern(String email, List<int> pattern) async {
 
 /// Refuses new oversized photos before they reach SQLite or Supabase.
 Future<Uint8List?> readAcceptedImage(
-  BuildContext context,
   XFile file, {
   required int maximumBytes,
 }) async {
   final bytes = await file.readAsBytes();
-  if (bytes.lengthInBytes <= maximumBytes) return bytes;
-  if (context.mounted) {
-    message(
-      context,
-      'Cette image est trop grande. Choisissez une image plus petite.',
-    );
-  }
-  return null;
+  return bytes.lengthInBytes <= maximumBytes ? bytes : null;
 }
 
 abstract final class SupabaseAccounts {
@@ -4745,8 +4737,6 @@ class _ForageHomeState extends State<ForageHome> {
         fileName: 'forage-zouhour-backup-$stamp.json',
         bytes: await widget.database.createBackup(passphrase),
         mimeType: 'application/json',
-        type: FileType.custom,
-        allowedExtensions: const ['json'],
       );
       if (savedFile == null) return false;
       await widget.database.recordSuccessfulBackup(now);
@@ -11548,11 +11538,14 @@ class _CategoryFormState extends State<CategoryForm> {
     );
     if (file == null) return;
     final bytes = await readAcceptedImage(
-      context,
       file,
       maximumBytes: 600 * 1024,
     );
-    if (bytes != null && mounted) setState(() => image = bytes);
+    if (!mounted) return;
+    if (bytes == null) {
+      return message(context, 'Cette image est trop grande. Choisissez-en une autre.');
+    }
+    setState(() => image = bytes);
   }
 
   void save() {
@@ -14015,11 +14008,14 @@ class _DepotFormState extends State<DepotForm> {
     );
     if (file != null) {
       final bytes = await readAcceptedImage(
-        context,
         file,
         maximumBytes: 600 * 1024,
       );
-      if (bytes != null && mounted) setState(() => image = bytes);
+      if (!mounted) return;
+      if (bytes == null) {
+        return message(context, 'Cette image est trop grande. Choisissez-en une autre.');
+      }
+      setState(() => image = bytes);
     }
   }
 
@@ -14234,11 +14230,14 @@ class _ProductFormState extends State<ProductForm> {
     );
     if (file != null) {
       final bytes = await readAcceptedImage(
-        context,
         file,
         maximumBytes: 600 * 1024,
       );
-      if (bytes != null && mounted) setState(() => image = bytes);
+      if (!mounted) return;
+      if (bytes == null) {
+        return message(context, 'Cette image est trop grande. Choisissez-en une autre.');
+      }
+      setState(() => image = bytes);
     }
   }
 
@@ -14621,7 +14620,7 @@ class _SupplierFormState extends State<SupplierForm> {
     if (picked.isEmpty) return;
     final selected = await Future.wait(
       picked.take(available).map(
-        (file) => readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+        (file) => readAcceptedImage(file, maximumBytes: 120 * 1024),
       ),
     );
     final bytes = selected.whereType<Uint8List>().toList();
@@ -14722,7 +14721,7 @@ class _ClientFormState extends State<ClientForm> {
     if (picked.isEmpty) return;
     final selected = await Future.wait(
       picked.take(available).map(
-        (file) => readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+        (file) => readAcceptedImage(file, maximumBytes: 120 * 1024),
       ),
     );
     final bytes = selected.whereType<Uint8List>().toList();
@@ -14920,8 +14919,7 @@ class _SaleFormState extends State<SaleForm> {
               imageQuality: 82,
               maxWidth: 1600,
             )).take(available).map(
-              (file) =>
-                  readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+              (file) => readAcceptedImage(file, maximumBytes: 120 * 1024),
             ),
           )
         : await (() async {
@@ -14934,7 +14932,6 @@ class _SaleFormState extends State<SaleForm> {
                 ? <Uint8List?>[]
                 : [
                     await readAcceptedImage(
-                      context,
                       file,
                       maximumBytes: 120 * 1024,
                     ),
@@ -15204,8 +15201,7 @@ class _StockFormState extends State<StockForm> {
               imageQuality: 82,
               maxWidth: 1600,
             )).take(available).map(
-              (file) =>
-                  readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+              (file) => readAcceptedImage(file, maximumBytes: 120 * 1024),
             ),
           )
         : await (() async {
@@ -15218,7 +15214,6 @@ class _StockFormState extends State<StockForm> {
                 ? <Uint8List?>[]
                 : [
                     await readAcceptedImage(
-                      context,
                       file,
                       maximumBytes: 120 * 1024,
                     ),
@@ -15876,11 +15871,14 @@ class _MachineFormState extends State<MachineForm> {
     );
     if (file != null) {
       final bytes = await readAcceptedImage(
-        context,
         file,
         maximumBytes: 600 * 1024,
       );
-      if (bytes != null && mounted) setState(() => unitImages[index] = bytes);
+      if (!mounted) return;
+      if (bytes == null) {
+        return message(context, 'Cette image est trop grande. Choisissez-en une autre.');
+      }
+      setState(() => unitImages[index] = bytes);
     }
   }
 
@@ -16689,11 +16687,14 @@ class _FinishOperationState extends State<FinishOperation> {
     );
     if (file != null) {
       final bytes = await readAcceptedImage(
-        context,
         file,
         maximumBytes: 600 * 1024,
       );
-      if (bytes != null && mounted) onPicked(bytes);
+      if (!mounted) return;
+      if (bytes == null) {
+        return message(context, 'Cette image est trop grande. Choisissez-en une autre.');
+      }
+      onPicked(bytes);
     }
   }
 
