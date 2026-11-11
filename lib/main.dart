@@ -90,6 +90,13 @@ String compactImageListJson(String value) {
   }
 }
 
+Future<String> passwordFromPattern(String email, List<int> pattern) async {
+  final digest = await Sha256().hash(
+    utf8.encode('forage-pattern-v1:${email.trim().toLowerCase()}:${pattern.join()}'),
+  );
+  return 'Fz1!${base64UrlEncode(digest.bytes).replaceAll('=', '')}a';
+}
+
 /// Refuses new oversized photos before they reach SQLite or Supabase.
 Future<Uint8List?> readAcceptedImage(
   BuildContext context,
@@ -4230,6 +4237,8 @@ class _InitialAdminSetupState extends State<InitialAdminSetup> {
 class _LoginPageState extends State<LoginPage> {
   final email = TextEditingController();
   final password = TextEditingController();
+  final pattern = <int>[];
+  var usesPattern = false;
   String? error;
   var authenticating = false;
   var awaitingApproval = false;
@@ -4243,7 +4252,14 @@ class _LoginPageState extends State<LoginPage> {
       awaitingApproval = false;
     });
     try {
-      final result = await widget.onLogin(email.text, password.text);
+      if (usesPattern && pattern.length < 4) {
+        setState(() => error = 'Reliez au moins 4 points.');
+        return;
+      }
+      final secret = usesPattern
+          ? await passwordFromPattern(email.text, pattern)
+          : password.text;
+      final result = await widget.onLogin(email.text, secret);
       if (!mounted || result.succeeded) return;
       if (result.failure == LoginFailure.devicePending) {
         setState(() => awaitingApproval = true);
@@ -4433,16 +4449,39 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: password,
-                        enabled: !authenticating && !awaitingApproval,
-                        obscureText: true,
-                        onSubmitted: authenticating ? null : (_) => login(),
-                        decoration: const InputDecoration(
-                          hintText: 'Mot de passe',
-                          prefixIcon: Icon(Icons.lock_outline_rounded),
-                        ),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(value: false, label: Text('Mot de passe')),
+                          ButtonSegment(value: true, label: Text('Schéma')),
+                        ],
+                        selected: {usesPattern},
+                        onSelectionChanged: authenticating || awaitingApproval
+                            ? null
+                            : (value) => setState(() => usesPattern = value.first),
                       ),
+                      const SizedBox(height: 12),
+                      if (usesPattern)
+                        PatternPad(
+                          pattern: pattern,
+                          onChanged: authenticating || awaitingApproval
+                              ? null
+                              : (value) => setState(() {
+                                    pattern
+                                      ..clear()
+                                      ..addAll(value);
+                                  }),
+                        )
+                      else
+                        TextField(
+                          controller: password,
+                          enabled: !authenticating && !awaitingApproval,
+                          obscureText: true,
+                          onSubmitted: authenticating ? null : (_) => login(),
+                          decoration: const InputDecoration(
+                            hintText: 'Mot de passe',
+                            prefixIcon: Icon(Icons.lock_outline_rounded),
+                          ),
+                        ),
                       if (error != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),
@@ -17381,15 +17420,25 @@ class _UserFormState extends State<UserForm> {
   final email = TextEditingController();
   final user = TextEditingController();
   final password = TextEditingController();
+  final pattern = <int>[];
+  var usesPattern = false;
   UserRole role = UserRole.operator;
-  void save() {
+  Future<void> save() async {
     if (!(form.currentState?.validate() ?? false)) return;
+    if (usesPattern && pattern.length < 4) {
+      message(context, 'Le schéma doit relier au moins 4 points.');
+      return;
+    }
+    final secret = usesPattern
+        ? await passwordFromPattern(email.text, pattern)
+        : password.text;
+    if (!mounted) return;
     Navigator.pop(
       context,
       AppUser(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         username: user.text.trim(),
-        password: password.text,
+        password: secret,
         fullName: full.text.trim(),
         email: email.text.trim().toLowerCase(),
         role: role,
@@ -17423,12 +17472,32 @@ class _UserFormState extends State<UserForm> {
             validator: emailValidator,
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: password,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Mot de passe *'),
-            validator: securePasswordValidator,
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, label: Text('Mot de passe')),
+              ButtonSegment(value: true, label: Text('Schéma')),
+            ],
+            selected: {usesPattern},
+            onSelectionChanged: (value) =>
+                setState(() => usesPattern = value.first),
           ),
+          const SizedBox(height: 12),
+          if (usesPattern)
+            PatternPad(
+              pattern: pattern,
+              onChanged: (value) => setState(() {
+                pattern
+                  ..clear()
+                  ..addAll(value);
+              }),
+            )
+          else
+            TextFormField(
+              controller: password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Mot de passe *'),
+              validator: securePasswordValidator,
+            ),
           const SizedBox(height: 18),
           const Align(
             alignment: Alignment.centerLeft,
@@ -17461,6 +17530,73 @@ class _UserFormState extends State<UserForm> {
         ],
       ),
     ),
+  );
+}
+
+/// Nine-point pattern input. A point can be used only once; tap selected
+/// points again to remove them, and the clear button starts a new pattern.
+class PatternPad extends StatelessWidget {
+  const PatternPad({super.key, required this.pattern, required this.onChanged});
+  final List<int> pattern;
+  final ValueChanged<List<int>>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      const Text('Dessinez votre schéma (4 points minimum).'),
+      const SizedBox(height: 10),
+      SizedBox(
+        width: 210,
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 9,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 18,
+            crossAxisSpacing: 18,
+          ),
+          itemBuilder: (context, index) {
+            final selected = pattern.contains(index);
+            return InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onChanged == null
+                  ? null
+                  : () {
+                      final next = List<int>.of(pattern);
+                      selected ? next.remove(index) : next.add(index);
+                      onChanged!(next);
+                    },
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? AppPalette.primary : AppPalette.soft,
+                  border: Border.all(
+                    color: selected ? AppPalette.primary : AppPalette.line,
+                    width: 2,
+                  ),
+                ),
+                child: selected
+                    ? Text(
+                        '${pattern.indexOf(index) + 1}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF151515),
+                          fontWeight: FontWeight.w900,
+                        ),
+                      )
+                    : null,
+              ),
+            );
+          },
+        ),
+      ),
+      TextButton.icon(
+        onPressed: onChanged == null ? null : () => onChanged!(const []),
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Effacer le schéma'),
+      ),
+    ],
   );
 }
 
