@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as image;
 import 'package:path/path.dart' show join;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -46,8 +47,65 @@ const _showStartupDiagnostics = bool.fromEnvironment(
 );
 const _localDatabaseName = String.fromEnvironment(
   'FORAGE_DATABASE_NAME',
-  defaultValue: 'forage.db',
+  // v2 avoids opening an older on-device database containing an oversized
+  // photo that Android cannot read. The cloud workspace is restored on launch.
+  defaultValue: 'forage-v2.db',
 );
+
+// Android CursorWindow cannot read a database row containing multi-megabyte
+// photos. Keep every stored image small enough for a row with several photos.
+Uint8List compactImageForStorage(Uint8List bytes) {
+  const maximumBytes = 120 * 1024;
+  if (bytes.lengthInBytes <= maximumBytes) return bytes;
+  final decoded = image.decodeImage(bytes);
+  if (decoded == null) return bytes;
+  Uint8List? last;
+  for (final setting in const [(800, 70), (640, 60), (512, 55), (400, 48), (320, 42)]) {
+    final maxSide = setting.$1;
+    final scale = decoded.width > decoded.height
+        ? maxSide / decoded.width
+        : maxSide / decoded.height;
+    final resized = scale < 1
+        ? image.copyResize(
+            decoded,
+            width: (decoded.width * scale).round(),
+            height: (decoded.height * scale).round(),
+          )
+        : decoded;
+    last = Uint8List.fromList(image.encodeJpg(resized, quality: setting.$2));
+    if (last.lengthInBytes <= maximumBytes) return last;
+  }
+  return last ?? bytes;
+}
+
+String compactImageListJson(String value) {
+  try {
+    final images = (jsonDecode(value) as List)
+        .whereType<String>()
+        .map((item) => base64Encode(compactImageForStorage(base64Decode(item))))
+        .toList();
+    return jsonEncode(images);
+  } catch (_) {
+    return value;
+  }
+}
+
+/// Refuses new oversized photos before they reach SQLite or Supabase.
+Future<Uint8List?> readAcceptedImage(
+  BuildContext context,
+  XFile file, {
+  required int maximumBytes,
+}) async {
+  final bytes = await file.readAsBytes();
+  if (bytes.lengthInBytes <= maximumBytes) return bytes;
+  if (context.mounted) {
+    message(
+      context,
+      'Cette image est trop grande. Choisissez une image plus petite.',
+    );
+  }
+  return null;
+}
 
 abstract final class SupabaseAccounts {
   static SupabaseClient get _client => Supabase.instance.client;
@@ -2582,7 +2640,9 @@ class AppDatabase {
       // fields are already JSON arrays of Base64 strings and pass through
       // unchanged.
       result[entry.key] = entry.value is Uint8List
-          ? base64Encode(entry.value as Uint8List)
+          ? base64Encode(compactImageForStorage(entry.value as Uint8List))
+          : entry.key == 'images' && entry.value is String
+          ? compactImageListJson(entry.value as String)
           : entry.value;
     }
     return result;
@@ -2597,8 +2657,11 @@ class AppDatabase {
     for (final column in binaryColumns) {
       final value = result[column];
       if (value is String) {
-        result[column] = base64Decode(value);
+        result[column] = compactImageForStorage(base64Decode(value));
       }
+    }
+    if (result['images'] is String) {
+      result['images'] = compactImageListJson(result['images'] as String);
     }
 
     // These defaults preserve compatibility with snapshots produced before
@@ -11445,8 +11508,12 @@ class _CategoryFormState extends State<CategoryForm> {
       maxWidth: 1600,
     );
     if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (mounted) setState(() => image = bytes);
+    final bytes = await readAcceptedImage(
+      context,
+      file,
+      maximumBytes: 600 * 1024,
+    );
+    if (bytes != null && mounted) setState(() => image = bytes);
   }
 
   void save() {
@@ -13908,8 +13975,12 @@ class _DepotFormState extends State<DepotForm> {
       maxWidth: 1600,
     );
     if (file != null) {
-      final bytes = await file.readAsBytes();
-      if (mounted) setState(() => image = bytes);
+      final bytes = await readAcceptedImage(
+        context,
+        file,
+        maximumBytes: 600 * 1024,
+      );
+      if (bytes != null && mounted) setState(() => image = bytes);
     }
   }
 
@@ -14123,8 +14194,12 @@ class _ProductFormState extends State<ProductForm> {
       maxWidth: 1600,
     );
     if (file != null) {
-      final bytes = await file.readAsBytes();
-      if (mounted) setState(() => image = bytes);
+      final bytes = await readAcceptedImage(
+        context,
+        file,
+        maximumBytes: 600 * 1024,
+      );
+      if (bytes != null && mounted) setState(() => image = bytes);
     }
   }
 
@@ -14505,9 +14580,13 @@ class _SupplierFormState extends State<SupplierForm> {
       maxWidth: 1600,
     );
     if (picked.isEmpty) return;
-    final bytes = await Future.wait(
-      picked.take(available).map((file) => file.readAsBytes()),
+    final selected = await Future.wait(
+      picked.take(available).map(
+        (file) => readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+      ),
     );
+    final bytes = selected.whereType<Uint8List>().toList();
+    if (bytes.isEmpty) return;
     if (mounted) setState(() => images.addAll(bytes));
     if (picked.length > available && mounted) {
       message(context, 'Maximum : 10 photos.');
@@ -14602,9 +14681,13 @@ class _ClientFormState extends State<ClientForm> {
       maxWidth: 1600,
     );
     if (picked.isEmpty) return;
-    final bytes = await Future.wait(
-      picked.take(available).map((file) => file.readAsBytes()),
+    final selected = await Future.wait(
+      picked.take(available).map(
+        (file) => readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+      ),
     );
+    final bytes = selected.whereType<Uint8List>().toList();
+    if (bytes.isEmpty) return;
     if (mounted) setState(() => images.addAll(bytes));
     if (picked.length > available && mounted) {
       message(context, 'Maximum : 10 photos.');
@@ -14792,12 +14875,15 @@ class _SaleFormState extends State<SaleForm> {
   Future<void> pickImages() async {
     final available = 10 - images.length;
     if (available <= 0) return message(context, 'Maximum : 10 photos.');
-    final bytes = widget.allowGallery
+    final selectedImages = widget.allowGallery
         ? await Future.wait(
             (await ImagePicker().pickMultiImage(
               imageQuality: 82,
               maxWidth: 1600,
-            )).take(available).map((file) => file.readAsBytes()),
+            )).take(available).map(
+              (file) =>
+                  readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+            ),
           )
         : await (() async {
             final file = await ImagePicker().pickImage(
@@ -14805,8 +14891,17 @@ class _SaleFormState extends State<SaleForm> {
               imageQuality: 82,
               maxWidth: 1600,
             );
-            return file == null ? <Uint8List>[] : [await file.readAsBytes()];
+            return file == null
+                ? <Uint8List?>[]
+                : [
+                    await readAcceptedImage(
+                      context,
+                      file,
+                      maximumBytes: 120 * 1024,
+                    ),
+                  ];
           })();
+    final bytes = selectedImages.whereType<Uint8List>().toList();
     if (bytes.isEmpty) return;
     if (mounted) setState(() => images.addAll(bytes));
   }
@@ -15064,12 +15159,15 @@ class _StockFormState extends State<StockForm> {
       message(context, 'Vous pouvez ajouter au maximum 10 photos.');
       return;
     }
-    final newImages = widget.allowGallery
+    final selectedImages = widget.allowGallery
         ? await Future.wait(
             (await ImagePicker().pickMultiImage(
               imageQuality: 82,
               maxWidth: 1600,
-            )).take(available).map((file) => file.readAsBytes()),
+            )).take(available).map(
+              (file) =>
+                  readAcceptedImage(context, file, maximumBytes: 120 * 1024),
+            ),
           )
         : await (() async {
             final file = await ImagePicker().pickImage(
@@ -15077,8 +15175,17 @@ class _StockFormState extends State<StockForm> {
               imageQuality: 82,
               maxWidth: 1600,
             );
-            return file == null ? <Uint8List>[] : [await file.readAsBytes()];
+            return file == null
+                ? <Uint8List?>[]
+                : [
+                    await readAcceptedImage(
+                      context,
+                      file,
+                      maximumBytes: 120 * 1024,
+                    ),
+                  ];
           })();
+    final newImages = selectedImages.whereType<Uint8List>().toList();
     if (newImages.isEmpty) return;
     if (mounted) setState(() => images.addAll(newImages));
   }
@@ -15729,8 +15836,12 @@ class _MachineFormState extends State<MachineForm> {
       maxWidth: 1600,
     );
     if (file != null) {
-      final bytes = await file.readAsBytes();
-      if (mounted) setState(() => unitImages[index] = bytes);
+      final bytes = await readAcceptedImage(
+        context,
+        file,
+        maximumBytes: 600 * 1024,
+      );
+      if (bytes != null && mounted) setState(() => unitImages[index] = bytes);
     }
   }
 
@@ -16538,8 +16649,12 @@ class _FinishOperationState extends State<FinishOperation> {
       maxWidth: 1600,
     );
     if (file != null) {
-      final bytes = await file.readAsBytes();
-      if (mounted) setState(() => onPicked(bytes));
+      final bytes = await readAcceptedImage(
+        context,
+        file,
+        maximumBytes: 600 * 1024,
+      );
+      if (bytes != null && mounted) onPicked(bytes);
     }
   }
 
