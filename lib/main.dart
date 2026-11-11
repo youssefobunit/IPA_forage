@@ -212,6 +212,7 @@ abstract final class SupabaseAccounts {
       final status = access is Map ? access['status']?.toString() : null;
       switch (status) {
         case 'approved':
+          await _recordDeviceLogin();
           return LoginResult.success(user);
         case 'outside_schedule':
           await _client.auth.signOut();
@@ -249,6 +250,7 @@ abstract final class SupabaseAccounts {
     final status = access is Map ? access['status']?.toString() : null;
     if (status == 'approved') {
       final user = await currentUser();
+      await _recordDeviceLogin();
       return user == null
           ? const LoginResult.failure(LoginFailure.invalidCredentials)
           : LoginResult.success(user);
@@ -298,9 +300,17 @@ abstract final class SupabaseAccounts {
   );
 
   static Future<void> signOut() async {
+    try {
+      await _client.rpc('record_forage_device_logout');
+    } catch (_) {}
     _loginNonce = null;
     await _client.auth.signOut();
   }
+
+  static Future<void> _recordDeviceLogin() => _client.rpc(
+    'record_forage_device_login',
+    params: {'p_label': appDevice.label, 'p_nonce': _loginNonce ?? ''},
+  );
 
   static Future<void> updateUser(AppUser user) async {
     await _client
@@ -409,10 +419,7 @@ abstract final class SupabaseAccounts {
   }
 
   static Future<List<TrustedDevice>> trustedDevices() async {
-    final rows = await _client
-        .from('trusted_devices')
-        .select('id, user_id, device_label, is_primary, access_status, last_seen_at')
-        .order('last_seen_at', ascending: false);
+    final rows = await _client.rpc('list_forage_device_activity');
     return (rows as List).cast<Map<String, dynamic>>().map(TrustedDevice.fromRow).toList();
   }
 
@@ -491,7 +498,8 @@ class DeviceAccessRequest {
 class TrustedDevice {
   const TrustedDevice({
     required this.id, required this.userId, required this.label,
-    required this.primary, required this.status,
+    required this.primary, required this.status, required this.email,
+    this.lastLoginAt, this.lastLogoutAt,
   });
   factory TrustedDevice.fromRow(Map<String, dynamic> row) => TrustedDevice(
     id: row['id'] as String,
@@ -499,12 +507,18 @@ class TrustedDevice {
     label: row['device_label'] as String? ?? 'Appareil inconnu',
     primary: row['is_primary'] == true,
     status: row['access_status'] as String? ?? 'active',
+    email: row['email'] as String? ?? '',
+    lastLoginAt: row['last_login_at'] == null ? null : DateTime.parse(row['last_login_at'] as String).toLocal(),
+    lastLogoutAt: row['last_logout_at'] == null ? null : DateTime.parse(row['last_logout_at'] as String).toLocal(),
   );
   final String id;
   final String userId;
   final String label;
   final bool primary;
   final String status;
+  final String email;
+  final DateTime? lastLoginAt;
+  final DateTime? lastLogoutAt;
 }
 
 abstract final class AppPalette {
@@ -13836,8 +13850,14 @@ class _DeviceRequestsPageState extends State<DeviceRequestsPage> {
                       ...items.map((device) => Glass(
                         child: ListTile(
                           leading: Icon(device.primary ? Icons.star_rounded : Icons.phone_android_rounded),
-                          title: Text('${widget.userName(device.userId)} · ${device.label}'),
-                          subtitle: Text(device.primary ? 'Principal · ${device.status}' : 'Secondaire · ${device.status}'),
+                          title: Text(device.label),
+                          subtitle: Text(
+                            '${device.email}\n'
+                            '${device.primary ? 'Principal' : 'Secondaire'} · ${device.status}\n'
+                            'Entrée : ${device.lastLoginAt == null ? '—' : dateText(device.lastLoginAt!)} · '
+                            'Sortie : ${device.lastLogoutAt == null ? 'En cours' : dateText(device.lastLogoutAt!)}',
+                          ),
+                          isThreeLine: true,
                           trailing: PopupMenuButton<String>(
                             onSelected: (value) => changeStatus(device, value),
                             itemBuilder: (_) => const [
